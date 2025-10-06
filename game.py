@@ -387,8 +387,35 @@ def draw_valid(moves):
     for i in range(len(moves)):
         pygame.draw.circle(screen, color, (moves[i][0] * 90 + 390+45, moves[i][1] * 96 + 75+48), 5)
 
-
+#依据王的存活状态检查对局
+def check_kings_alive():
+    """
+    检查黑白王是否存活
+    返回: (white_king_alive, black_king_alive)
+    """
+    white_king_alive = 'king' in white_pieces
+    black_king_alive = 'king' in black_pieces
     
+    return white_king_alive, black_king_alive
+
+def update_winner():
+    """
+    根据王存活状态更新胜利者
+    """
+    global winner, game_over
+    
+    white_king_alive, black_king_alive = check_kings_alive()
+    
+    if not white_king_alive and not black_king_alive:
+        winner = 'draw'  # 平局
+        
+    elif not white_king_alive:
+        winner = 'black'  # 黑方胜利
+        
+    elif not black_king_alive:
+        winner = 'white'  # 白方胜利
+        
+
 #main game loop
 is_victory_cg=False
 is_victory_cg_played=False
@@ -536,8 +563,15 @@ while run:
                 valid_moves = []
                 black_options = check_options(black_pieces, black_locations, 'black')
                 white_options = check_options(white_pieces, white_locations, 'white')
-
-        
+                
+                is_victory_cg=False
+                is_victory_cg_played=False
+                is_white_cg=True
+                is_white_promoting=False
+                is_black_promoting=False
+                promote_location=(0,0)
+    
+    update_winner()     
 
     if winner != '' and not is_victory_cg_played:
         if winner=='white':
