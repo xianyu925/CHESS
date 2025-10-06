@@ -2,6 +2,9 @@
 # part one, set up variables images and game loop
 
 import pygame
+import cv2
+import numpy as np
+from moviepy import VideoFileClip
 
 pygame.init()
 WIDTH = 1500
@@ -22,6 +25,9 @@ black_pieces = ['rook', 'knight', 'bishop', 'king', 'queen', 'bishop', 'knight',
                 'pawn', 'pawn', 'pawn', 'pawn', 'pawn', 'pawn', 'pawn', 'pawn']
 black_locations = [(0, 0), (1, 0), (2, 0), (3, 0), (4, 0), (5, 0), (6, 0), (7, 0),
                    (0, 1), (1, 1), (2, 1), (3, 1), (4, 1), (5, 1), (6, 1), (7, 1)]
+
+target_locations=[(0, 0), (1, 0), (2, 0), (3, 0), (4, 0), (5, 0), (6, 0), (7, 0),
+                 (0, 7), (1, 7), (2, 7), (3, 7), (4, 7), (5, 7), (6, 7), (7, 7)]
 
 captured_pieces_white = []
 captured_pieces_black = []
@@ -79,6 +85,80 @@ menu=pygame.image.load('images/menu1.png')
 menu=pygame.transform.scale(menu,(WIDTH,HEIGHT))
 backgroud=pygame.image.load('images/backgroud.png')
 backgroud=pygame.transform.scale(backgroud,(WIDTH,HEIGHT))
+
+#升阶动画加载及播放
+
+def play_video(path, screen, position=(0, 0), size=None, loop=False):
+    """
+    播放视频动画函数
+    
+    参数:
+    path: 视频文件路径
+    screen: pygame的screen对象
+    position: 视频播放位置 (x, y)
+    size: 视频尺寸 (width, height)，None为原尺寸
+    loop: 是否循环播放
+    
+    返回:
+    bool: 播放是否成功
+    """
+    try:
+        # 打开视频文件
+        cap = cv2.VideoCapture(path)
+        if not cap.isOpened():
+            print(f"无法打开视频文件: {path}")
+            return False
+        
+        # 获取视频信息
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        
+        # 计算每帧延迟
+        delay = max(1, int(1000 / fps)) if fps > 0 else 30
+        
+        # 播放视频
+        clock = pygame.time.Clock()
+        playing = True
+        current_frame = 0
+        
+        while playing and current_frame < total_frames:
+            ret, frame = cap.read()
+            if not ret:
+                break
+                
+            # 转换颜色空间 BGR -> RGB
+            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            
+            # 调整尺寸
+            if size:
+                frame_rgb = cv2.resize(frame_rgb, size)
+            
+            # 转换为pygame surface
+            frame_rgb = np.fliplr(frame_rgb)  # 左右翻转
+            frame_surface = pygame.surfarray.make_surface(np.rot90(frame_rgb))
+            
+            # 显示帧
+            screen.blit(frame_surface, position)
+            pygame.display.flip()
+            
+            # 处理事件
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    playing = False
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        playing = False
+            
+            current_frame += 1
+            clock.tick(fps if fps > 0 else 30)
+        
+        cap.release()
+        return True
+        
+    except Exception as e:
+        print(f"播放视频时出错: {e}")
+        return False
+
 # check variables/ flashing counter
 
 counter = 0
@@ -86,6 +166,12 @@ winner = ''
 game_over = False
 is_game_start=False
 
+def draw_game_over():
+    """简化版本 - 直接显示游戏结束界面"""
+    # 显示游戏结束界面
+    pygame.draw.rect(screen, 'black', [600, 380, 400, 70])
+    screen.blit(font.render(f'{winner} won the game!', True, 'white'), (610, 390))
+    screen.blit(font.render(f'Press ENTER to Restart!', True, 'white'), (610, 420))
 
 def draw_pieces():
     for i in range(len(white_pieces)):
@@ -241,7 +327,8 @@ def check_pawn(position, color):
                 (position[0], position[1] - 1) not in black_locations and position[1] > 0:
             moves_list.append((position[0], position[1] - 1))
         if (position[0], position[1] - 2) not in white_locations and \
-                (position[0], position[1] - 2) not in black_locations and position[1] == 6:
+                (position[0], position[1] - 2) not in black_locations and position[1] == 6 and \
+                    (position[0], position[1] - 1) not in black_locations:
             moves_list.append((position[0], position[1] - 2))
         if (position[0] + 1, position[1] - 1) in black_locations:
             moves_list.append((position[0] + 1, position[1] - 1))
@@ -253,7 +340,8 @@ def check_pawn(position, color):
                 (position[0], position[1] + 1) not in black_locations and position[1] < 7:
             moves_list.append((position[0], position[1] + 1))
         if (position[0], position[1] + 2) not in white_locations and \
-                (position[0], position[1] + 2) not in black_locations and position[1] == 1:
+                (position[0], position[1] + 2) not in black_locations and position[1] == 1 and \
+                    (position[0], position[1] + 1) not in white_locations:
             moves_list.append((position[0], position[1] + 2))
         if (position[0] + 1, position[1] + 1) in white_locations:
             moves_list.append((position[0] + 1, position[1] + 1))
@@ -300,16 +388,18 @@ def draw_valid(moves):
         pygame.draw.circle(screen, color, (moves[i][0] * 90 + 390+45, moves[i][1] * 96 + 75+48), 5)
 
 
-def draw_game_over():
-    pygame.draw.rect(screen, 'black', [600, 380, 400, 70])
-    screen.blit(font.render(f'{winner} won the game!', True, 'white'), (610, 390))
-    screen.blit(font.render(f'Press ENTER to Restart!', True, 'white'), (610, 420))
-
-
+    
 #main game loop
+is_victory_cg=False
+is_victory_cg_played=False
+is_white_cg=True
+is_white_promoting=False
+is_black_promoting=False
+promote_location=(0,0)
 black_options = check_options(black_pieces, black_locations, 'black')
 white_options = check_options(white_pieces, white_locations, 'white')
-
+        
+   
 run=True
 while run:
     timer.tick(fps)
@@ -324,13 +414,51 @@ while run:
                 is_game_start=True
                 continue
     else:
+        if is_victory_cg:
+            if is_white_cg:
+                is_victory_cg=False
+                play_video('video/manfang.mp4',screen,(0,50),size=(WIDTH,HEIGHT-100)) 
+            else :
+                is_victory_cg=False
+                play_video('video/laigushi_win_cg.mp4',screen,(0,50),size=(WIDTH,HEIGHT-100))    
+
         screen.blit(backgroud,(0,0))
         draw_pieces()
         if selection != 100:
             valid_moves = check_valid_moves()
             draw_valid(valid_moves)
+            
+        if game_over:
+            draw_game_over()
     # event handling
     for event in pygame.event.get():
+        #棋子升阶
+        if not game_over:
+            if is_white_promoting or is_black_promoting:
+                if is_white_promoting:
+                    if event.type == pygame.KEYDOWN:
+                        if event.key==pygame.K_UP :
+                            white_pieces[white_locations.index(promote_location)]='queen'
+                        elif event.key==pygame.K_DOWN :
+                            white_pieces[white_locations.index(promote_location)]='knight'
+                        elif event.key==pygame.K_LEFT:
+                            white_pieces[white_locations.index(promote_location)]='bishop'
+                        elif event.key==pygame.K_RIGHT :
+                            white_pieces[white_locations.index(promote_location)]='rook'
+                        is_white_promoting=False
+                        play_video('video/shengjie_plus.mp4',screen,size=(WIDTH, HEIGHT))
+                elif is_black_promoting:
+                    if event.type == pygame.KEYDOWN:
+                        if event.key==pygame.K_UP :
+                            black_pieces[black_locations.index(promote_location)]='queen'
+                        elif event.key==pygame.K_DOWN :
+                            black_pieces[black_locations.index(promote_location)]='knight'
+                        elif event.key==pygame.K_LEFT:
+                            black_pieces[black_locations.index(promote_location)]='bishop'
+                        elif event.key==pygame.K_RIGHT :
+                            black_pieces[black_locations.index(promote_location)]='rook'
+                        is_black_promoting=False
+                        play_video('video/laigushi_shengjie.mp4',screen,size=(WIDTH, HEIGHT))
         if event.type == pygame.QUIT:
             run = False
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and not game_over:
@@ -353,6 +481,10 @@ while run:
                             winner = 'white'
                         black_pieces.pop(black_piece)
                         black_locations.pop(black_piece)
+                    if click_coords in target_locations:
+                        if white_pieces[white_locations.index(click_coords)]=='pawn':
+                            promote_location=click_coords
+                            is_white_promoting=True
                     black_options = check_options(black_pieces, black_locations, 'black')
                     white_options = check_options(white_pieces, white_locations, 'white')
                     turn_step = 2
@@ -374,12 +506,18 @@ while run:
                             winner = 'black'
                         white_pieces.pop(white_piece)
                         white_locations.pop(white_piece)
+                    if click_coords in target_locations:
+                        if black_pieces[black_locations.index(click_coords)]=='pawn':
+                            promote_location=click_coords
+                            is_black_promoting=True
                     black_options = check_options(black_pieces, black_locations, 'black')
                     white_options = check_options(white_pieces, white_locations, 'white')
                     turn_step = 0
                     selection = 100
                     valid_moves = []
-        if event.type == pygame.KEYDOWN and game_over:
+
+
+        if event.type == pygame.KEYDOWN and game_over :
             if event.key == pygame.K_RETURN:
                 game_over = False
                 winner = ''
@@ -399,9 +537,16 @@ while run:
                 black_options = check_options(black_pieces, black_locations, 'black')
                 white_options = check_options(white_pieces, white_locations, 'white')
 
-    if winner != '':
-        game_over = True
-        draw_game_over()
+        
+
+    if winner != '' and not is_victory_cg_played:
+        if winner=='white':
+            is_white_cg=True
+        else:
+            is_white_cg=False
+        is_victory_cg=True
+        game_over = True      
+        is_victory_cg_played=True
 
     pygame.display.flip()
 pygame.quit()
