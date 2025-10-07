@@ -5,6 +5,7 @@ import pygame
 import cv2
 import numpy as np
 from moviepy import VideoFileClip
+import os
 
 pygame.init()
 WIDTH = 1500
@@ -85,6 +86,32 @@ menu=pygame.image.load('images/menu1.png')
 menu=pygame.transform.scale(menu,(WIDTH,HEIGHT))
 backgroud=pygame.image.load('images/backgroud.png')
 backgroud=pygame.transform.scale(backgroud,(WIDTH,HEIGHT))
+
+#BGM
+def play_music(music_file, volume=0.5, loops=-1):
+    """
+    在游戏中播放背景音乐
+    
+    参数:
+    music_file (str): 音乐文件路径
+    volume (float): 音量大小 (0.0 到 1.0)，默认0.5
+    loops (int): 循环次数，-1表示无限循环，默认-1
+    """
+    # 确保pygame mixer已初始化
+    if not pygame.mixer.get_init():
+        pygame.mixer.init()
+    
+    try:
+        # 加载并播放音乐
+        pygame.mixer.music.load(music_file)
+        pygame.mixer.music.set_volume(volume)
+        pygame.mixer.music.play(loops)
+        print(f"正在播放: {os.path.basename(music_file)}")
+        return True
+    except pygame.error as e:
+        print(f"无法加载音乐文件 '{music_file}': {e}")
+        return False
+
 
 #升阶动画加载及播放
 
@@ -457,6 +484,8 @@ black_options = check_options(black_pieces, black_locations, 'black')
 white_options = check_options(white_pieces, white_locations, 'white')
         
    
+play_music('BGM/Sway to My Beat in Cosmos.flac',volume=0.7)
+
 run=True
 while run:
     timer.tick(fps)
