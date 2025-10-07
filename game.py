@@ -173,6 +173,35 @@ def draw_game_over():
     screen.blit(font.render(f'{winner} won the game!', True, 'white'), (610, 390))
     screen.blit(font.render(f'Press ENTER to Restart!', True, 'white'), (610, 420))
 
+def draw_build_up():
+    pygame.draw.rect(screen, 'black', [600, 380, 400, 140])
+    screen.blit(font.render(f'Press keyup build up to queen', True, 'white'), (610, 390))
+    screen.blit(font.render(f'Press keydown build up to knight', True, 'white'), (610, 420))
+    screen.blit(font.render(f'Press keyleft build up to bishop', True, 'white'), (610, 450))
+    screen.blit(font.render(f'Press keyright build up to rook', True, 'white'), (610, 480))
+
+
+# draw a flashing square around king if in check
+def draw_check():
+    if turn_step < 2:
+        if 'king' in white_pieces:
+            king_index = white_pieces.index('king')
+            king_location = white_locations[king_index]
+            for i in range(len(black_options)):
+                if king_location in black_options[i]:
+                    if counter < 15:
+                        pygame.draw.rect(screen, 'dark red', [white_locations[king_index][0] * 90 + 390,
+                                                              white_locations[king_index][1] * 96 + 72, 90, 96], 5)
+    else:
+        if 'king' in black_pieces:
+            king_index = black_pieces.index('king')
+            king_location = black_locations[king_index]
+            for i in range(len(white_options)):
+                if king_location in white_options[i]:
+                    if counter < 15:
+                        pygame.draw.rect(screen, 'dark blue', [black_locations[king_index][0] * 90 + 390,
+                                                               black_locations[king_index][1] * 96 + 72, 90, 96], 5)
+
 def draw_pieces():
     for i in range(len(white_pieces)):
         index = piece_list.index(white_pieces[i])
@@ -416,6 +445,7 @@ def update_winner():
         winner = 'white'  # 白方胜利
         
 
+
 #main game loop
 is_victory_cg=False
 is_victory_cg_played=False
@@ -451,12 +481,17 @@ while run:
 
         screen.blit(backgroud,(0,0))
         draw_pieces()
+        draw_check()
         if selection != 100:
             valid_moves = check_valid_moves()
             draw_valid(valid_moves)
             
         if game_over:
             draw_game_over()
+
+        if is_black_promoting or is_white_promoting:
+            draw_build_up()
+        
     # event handling
     for event in pygame.event.get():
         #棋子升阶
@@ -570,7 +605,7 @@ while run:
                 is_white_promoting=False
                 is_black_promoting=False
                 promote_location=(0,0)
-    
+                
     update_winner()     
 
     if winner != '' and not is_victory_cg_played:
