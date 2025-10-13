@@ -6,6 +6,7 @@ import cv2
 import numpy as np
 from moviepy import VideoFileClip
 import os
+from agent import Agent
 
 pygame.init()
 WIDTH = 1500
@@ -472,7 +473,40 @@ def update_winner():
     elif not black_king_alive:
         winner = 'white'  # 白方胜利
         
+def update_board():
+    board = np.zeros((8, 8), dtype=int)
+    #对于白  rook:-1,knight:-2,bishop:-3，queen:-4,king:-5.pawn:-6
+    #对于黑  rook:1,knight:2,bishop:3，queen:4,king:5.pawn:6
+    for i in range(len(white_pieces)):
+        if white_pieces[i] == 'rook':
+            board[white_locations[i][0]][white_locations[i][1]]=-1
+        if white_pieces[i] == 'knight':
+            board[white_locations[i][0]][white_locations[i][1]]=-2
+        if white_pieces[i] == 'bishop':
+            board[white_locations[i][0]][white_locations[i][1]]=-3
+        if white_pieces[i] == 'queen':
+            board[white_locations[i][0]][white_locations[i][1]]=-4
+        if white_pieces[i] == 'king':
+            board[white_locations[i][0]][white_locations[i][1]]=-5
+        if white_pieces[i] == 'pawn':
+            board[white_locations[i][0]][white_locations[i][1]]=-6
 
+    for i in range(len(black_pieces)):
+        index = piece_list.index(black_pieces[i])
+        if black_pieces[i] == 'rook':
+            board[black_locations[i][0]][black_locations[i][1]]=1
+        if black_pieces[i] == 'knight':
+            board[black_locations[i][0]][black_locations[i][1]]=2
+        if black_pieces[i] == 'bishop':
+            board[black_locations[i][0]][black_locations[i][1]]=3
+        if black_pieces[i] == 'queen':
+            board[black_locations[i][0]][black_locations[i][1]]=4
+        if black_pieces[i] == 'king':
+            board[black_locations[i][0]][black_locations[i][1]]=5
+        if black_pieces[i] == 'pawn':
+            board[black_locations[i][0]][black_locations[i][1]]=6
+    
+    return board
 
 #main game loop
 is_victory_cg=False
@@ -483,7 +517,9 @@ is_black_promoting=False
 promote_location=(0,0)
 black_options = check_options(black_pieces, black_locations, 'black')
 white_options = check_options(white_pieces, white_locations, 'white')
-        
+ # 创建实例
+agent_instance = Agent()
+
    
 play_music('BGM/Sway to My Beat in Cosmos.flac',volume=0.7)
 
@@ -501,6 +537,8 @@ while run:
                 is_game_start=True
                 continue
     else:
+        
+
         if is_victory_cg:
             if is_white_cg:
                 is_victory_cg=False
@@ -519,7 +557,7 @@ while run:
         if game_over:
             draw_game_over()
 
-        if is_black_promoting or is_white_promoting:
+        if  is_white_promoting:
             draw_build_up()
         
     # event handling
@@ -538,75 +576,82 @@ while run:
                         elif event.key==pygame.K_RIGHT :
                             white_pieces[white_locations.index(promote_location)]='rook'
                         is_white_promoting=False
+                        black_options = check_options(black_pieces, black_locations, 'black')
+                        white_options = check_options(white_pieces, white_locations, 'white')
                         play_video('video/shengjie_plus.mp4',screen,size=(WIDTH, HEIGHT))
                 elif is_black_promoting:
-                    if event.type == pygame.KEYDOWN:
-                        if event.key==pygame.K_UP :
+                        new_board=update_board()
+                        choose=agent_instance.build_up(new_board)
+                        if choose==1:
                             black_pieces[black_locations.index(promote_location)]='queen'
-                        elif event.key==pygame.K_DOWN :
+                        if choose==2:
                             black_pieces[black_locations.index(promote_location)]='knight'
-                        elif event.key==pygame.K_LEFT:
+                        if choose==3:
                             black_pieces[black_locations.index(promote_location)]='bishop'
-                        elif event.key==pygame.K_RIGHT :
+                        if choose==4:
                             black_pieces[black_locations.index(promote_location)]='rook'
                         is_black_promoting=False
+                        black_options = check_options(black_pieces, black_locations, 'black')
+                        white_options = check_options(white_pieces, white_locations, 'white')
                         play_video('video/laigushi_shengjie.mp4',screen,size=(WIDTH, HEIGHT))
         if event.type == pygame.QUIT:
             run = False
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and not game_over:
-            x_coord = (event.pos[0]-395) // 90
-            y_coord = (event.pos[1]-75) // 96
-            click_coords = (x_coord, y_coord)
-            if turn_step <= 1:
-                #if click_coords == (8, 8) or click_coords == (9, 8):
-                #    winner = 'black'
-                if click_coords in white_locations:
-                    selection = white_locations.index(click_coords)
-                    if turn_step == 0:
-                        turn_step = 1
-                if click_coords in valid_moves and selection != 100:
-                    white_locations[selection] = click_coords
-                    if click_coords in black_locations:
-                        black_piece = black_locations.index(click_coords)
-                        captured_pieces_white.append(black_pieces[black_piece])
-                        if black_pieces[black_piece] == 'king':
-                            winner = 'white'
-                        black_pieces.pop(black_piece)
-                        black_locations.pop(black_piece)
-                    if click_coords in target_locations:
-                        if white_pieces[white_locations.index(click_coords)]=='pawn':
-                            promote_location=click_coords
-                            is_white_promoting=True
-                    black_options = check_options(black_pieces, black_locations, 'black')
-                    white_options = check_options(white_pieces, white_locations, 'white')
-                    turn_step = 2
-                    selection = 100
-                    valid_moves = []
-            if turn_step > 1:
-                #if click_coords == (8, 8) or click_coords == (9, 8):
-                #  winner = 'white'
-                if click_coords in black_locations:
-                    selection = black_locations.index(click_coords)
-                    if turn_step == 2:
-                        turn_step = 3
-                if click_coords in valid_moves and selection != 100:
-                    black_locations[selection] = click_coords
+        
+        if not game_over:
+            if turn_step<=1:
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 :
+                    x_coord = (event.pos[0]-395) // 90
+                    y_coord = (event.pos[1]-75) // 96
+                    click_coords = (x_coord, y_coord)
                     if click_coords in white_locations:
-                        white_piece = white_locations.index(click_coords)
-                        captured_pieces_black.append(white_pieces[white_piece])
-                        if white_pieces[white_piece] == 'king':
-                            winner = 'black'
-                        white_pieces.pop(white_piece)
-                        white_locations.pop(white_piece)
-                    if click_coords in target_locations:
-                        if black_pieces[black_locations.index(click_coords)]=='pawn':
-                            promote_location=click_coords
-                            is_black_promoting=True
-                    black_options = check_options(black_pieces, black_locations, 'black')
-                    white_options = check_options(white_pieces, white_locations, 'white')
-                    turn_step = 0
-                    selection = 100
-                    valid_moves = []
+                        selection = white_locations.index(click_coords)
+                        if turn_step == 0:
+                            turn_step = 1
+                    if click_coords in valid_moves and selection != 100:
+                        white_locations[selection] = click_coords
+                        if click_coords in black_locations:
+                            black_piece = black_locations.index(click_coords)
+                            captured_pieces_white.append(black_pieces[black_piece])
+                            if black_pieces[black_piece] == 'king':
+                                winner = 'white'
+                            black_pieces.pop(black_piece)
+                            black_locations.pop(black_piece)
+                        if click_coords in target_locations:
+                            if white_pieces[white_locations.index(click_coords)]=='pawn':
+                                promote_location=click_coords
+                                is_white_promoting=True
+                        black_options = check_options(black_pieces, black_locations, 'black')
+                        white_options = check_options(white_pieces, white_locations, 'white')
+                        turn_step = 2
+                        selection = 100
+                        valid_moves = [] 
+            if  turn_step>1:
+                turn_step=3
+
+                new_board=update_board()
+                
+                move = agent_instance.make_move(new_board.copy())
+                selection=black_locations.index(move[0])
+                click_coords=move[1]
+                black_locations[selection] = click_coords
+                if click_coords in white_locations:
+                    white_piece = white_locations.index(click_coords)
+                    captured_pieces_black.append(white_pieces[white_piece])
+                    if white_pieces[white_piece] == 'king':
+                        winner = 'black'
+                    white_pieces.pop(white_piece)
+                    white_locations.pop(white_piece)
+                if click_coords in target_locations:
+                    if black_pieces[black_locations.index(click_coords)]=='pawn':
+                        promote_location=click_coords
+                        is_black_promoting=True
+                black_options = check_options(black_pieces, black_locations, 'black')
+                white_options = check_options(white_pieces, white_locations, 'white')
+                turn_step = 0
+                selection = 100
+                valid_moves = []
+
+
 
 
         if event.type == pygame.KEYDOWN and game_over :
@@ -635,7 +680,7 @@ while run:
                 is_white_promoting=False
                 is_black_promoting=False
                 promote_location=(0,0)
-                
+                update_board()
     update_winner()     
 
     if winner != '' and not is_victory_cg_played:
