@@ -625,7 +625,7 @@ while run:
                         turn_step = 2
                         selection = 100
                         valid_moves = [] 
-            if  turn_step>1:
+            elif  turn_step>1:
                 turn_step=3
 
                 new_board=update_board()

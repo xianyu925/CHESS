@@ -2,10 +2,10 @@ import random
 
 
 class Agent:
-    def __init__(self):  # 添加self参数
+    def __init__(self): 
         pass
     
-    def make_move(self, board):  # 添加self参数
+    def make_move(self, board):  
         #返回[(x1,y1),(x2,y2)],表示将x1,y1位置的棋子移动到x2,y2
         #对于白  rook:-1,knight:-2,bishop:-3，queen:-4,king:-5.pawn:-6
         #对于黑  rook:1,knight:2,bishop:3，queen:4,king:5.pawn:6
