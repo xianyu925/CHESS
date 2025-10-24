@@ -231,6 +231,39 @@ def draw_check():
                         pygame.draw.rect(screen, 'dark blue', [black_locations[king_index][0] * 90 + 390,
                                                                black_locations[king_index][1] * 96 + 72, 90, 96], 5)
 
+def check_yiwei(type):
+    
+    enemies_list = black_locations
+    friends_list = white_locations
+    #短易位
+    if type==0 :
+        if not can_yiwei_right:
+            return False
+        targets=[(5,7),(6,7)]
+        for target in targets:
+            if target in friends_list or target in enemies_list:
+                return False
+        targets.extend([(4,7), (7,7)])
+        for target in targets:
+            for i in range(len(black_options)):
+                if target in black_options[i]:
+                    return False
+    #长易位  
+    if type==1:
+        if not can_yiwei_left:
+            return False
+        targets=[(1,7),(2,7),(3,7)]
+        for target in targets:
+            if target in friends_list or target in enemies_list:
+                return False
+        targets.extend([(0,7),(4,7)])
+        for target in targets:
+            for i in range(len(black_options)):
+                if target in black_options[i]:
+                    return False
+    return True
+
+
 def draw_pieces():
     for i in range(len(white_pieces)):
         index = piece_list.index(white_pieces[i])
@@ -293,6 +326,15 @@ def check_king(position, color):
         target = (position[0] + targets[i][0], position[1] + targets[i][1])
         if target not in friends_list and 0 <= target[0] <= 7 and 0 <= target[1] <= 7:
             moves_list.append(target)
+    
+    #白方王车易位
+    if can_yiwei_left and color=='white':
+        if check_yiwei(1):
+            moves_list.append((0,7))
+    if can_yiwei_right and color=='white':
+        if check_yiwei(0):
+            moves_list.append((7,7))
+
     return moves_list
 
 
@@ -509,6 +551,8 @@ def update_board():
     return board
 
 #main game loop
+can_yiwei_left=True
+can_yiwei_right=True
 is_victory_cg=False
 is_victory_cg_played=False
 is_white_cg=True
@@ -604,22 +648,46 @@ while run:
                     y_coord = (event.pos[1]-75) // 96
                     click_coords = (x_coord, y_coord)
                     if click_coords in white_locations:
-                        selection = white_locations.index(click_coords)
+                        if not (selection!=100 and  white_pieces[selection]=='king' and ((check_yiwei(0) and click_coords==(7,7)) or (check_yiwei(1) and click_coords==(0,7))) ):
+                            selection = white_locations.index(click_coords)
                         if turn_step == 0:
                             turn_step = 1
-                    if click_coords in valid_moves and selection != 100:
-                        white_locations[selection] = click_coords
-                        if click_coords in black_locations:
-                            black_piece = black_locations.index(click_coords)
-                            captured_pieces_white.append(black_pieces[black_piece])
-                            if black_pieces[black_piece] == 'king':
-                                winner = 'white'
-                            black_pieces.pop(black_piece)
-                            black_locations.pop(black_piece)
-                        if click_coords in target_locations:
-                            if white_pieces[white_locations.index(click_coords)]=='pawn':
-                                promote_location=click_coords
-                                is_white_promoting=True
+
+                    if click_coords in valid_moves and selection != 100:       
+                        is_yiwei=False
+                        if white_pieces[selection]=='king' :
+                            if click_coords==(0,7) and can_yiwei_left:
+                               white_locations[white_locations.index(click_coords)]=(3,7)
+                               white_locations[selection]=(2,7)
+                               is_yiwei=True
+                            if click_coords==(7,7) and can_yiwei_right:
+                               white_locations[white_locations.index(click_coords)]=(5,7)
+                               white_locations[selection]=(6,7)
+                               is_yiwei=True
+
+                            can_yiwei_right=False
+                            can_yiwei_left=False
+
+                        if white_pieces[selection]=='rook' :
+                            if white_locations[selection]==(0,7):
+                                can_yiwei_left=False
+                            if white_locations[selection]==(7,7):
+                                can_yiwei_right=False
+
+                        if not is_yiwei:
+                                white_locations[selection] = click_coords
+
+                                if click_coords in black_locations:
+                                    black_piece = black_locations.index(click_coords)
+                                    captured_pieces_white.append(black_pieces[black_piece])
+                                    if black_pieces[black_piece] == 'king':
+                                        winner = 'white'
+                                    black_pieces.pop(black_piece)
+                                    black_locations.pop(black_piece)
+                                if click_coords in target_locations:
+                                    if white_pieces[white_locations.index(click_coords)]=='pawn':
+                                        promote_location=click_coords
+                                        is_white_promoting=True
                         black_options = check_options(black_pieces, black_locations, 'black')
                         white_options = check_options(white_pieces, white_locations, 'white')
                         turn_step = 2
@@ -633,18 +701,31 @@ while run:
                 move = agent_instance.make_move(new_board.copy())
                 selection=black_locations.index(move[0])
                 click_coords=move[1]
-                black_locations[selection] = click_coords
-                if click_coords in white_locations:
-                    white_piece = white_locations.index(click_coords)
-                    captured_pieces_black.append(white_pieces[white_piece])
-                    if white_pieces[white_piece] == 'king':
-                        winner = 'black'
-                    white_pieces.pop(white_piece)
-                    white_locations.pop(white_piece)
-                if click_coords in target_locations:
-                    if black_pieces[black_locations.index(click_coords)]=='pawn':
-                        promote_location=click_coords
-                        is_black_promoting=True
+
+                is_yiwei=False
+                if black_pieces[selection]=='king' and move[0]==(4,0) :
+                    if click_coords==(0,0) :
+                        black_locations[selection]=(2,0)
+                        black_locations[black_locations.index(move[1])]=(3,0)
+                        is_yiwei=True
+                    if click_coords==(7,0) :
+                        black_locations[selection]=(6,0)
+                        black_locations[black_locations.index(move[1])]=(5,0)
+                        is_yiwei=True
+
+                if not is_yiwei:
+                    black_locations[selection] = click_coords
+                    if click_coords in white_locations:
+                        white_piece = white_locations.index(click_coords)
+                        captured_pieces_black.append(white_pieces[white_piece])
+                        if white_pieces[white_piece] == 'king':
+                            winner = 'black'
+                        white_pieces.pop(white_piece)
+                        white_locations.pop(white_piece)
+                    if click_coords in target_locations:
+                        if black_pieces[black_locations.index(click_coords)]=='pawn':
+                            promote_location=click_coords
+                            is_black_promoting=True
                 black_options = check_options(black_pieces, black_locations, 'black')
                 white_options = check_options(white_pieces, white_locations, 'white')
                 turn_step = 0
@@ -674,6 +755,8 @@ while run:
                 black_options = check_options(black_pieces, black_locations, 'black')
                 white_options = check_options(white_pieces, white_locations, 'white')
                 
+                can_yiwei_left=True
+                can_yiwei_right=True
                 is_victory_cg=False
                 is_victory_cg_played=False
                 is_white_cg=True

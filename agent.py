@@ -6,7 +6,7 @@ class Agent:
         pass
     
     def make_move(self, board):  
-        #返回[(x1,y1),(x2,y2)],表示将x1,y1位置的棋子移动到x2,y2
+        #返回[(x1,y1),(x2,y2)],表示将x1,y1位置的棋子移动到x2,y2,    特别地，返回[(4,0),(0,0)][(4,0),(7,0)](此时要求(4,0)位置为king）视为王车易位（前一个表示王与棋盘左上角的车易位）
         #对于白  rook:-1,knight:-2,bishop:-3，queen:-4,king:-5.pawn:-6
         #对于黑  rook:1,knight:2,bishop:3，queen:4,king:5.pawn:6
         #空白：0
@@ -36,6 +36,7 @@ class Agent:
         end_pos=random.choice(valid_cells)
 
         return [start_pos, end_pos]
+        
     
     #升阶处理
     def build_up(self,board):
