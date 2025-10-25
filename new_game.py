@@ -434,6 +434,11 @@ def check_pawn(position, color):
             moves_list.append((position[0] + 1, position[1] - 1))
         if (position[0] - 1, position[1] - 1) in black_locations:
             moves_list.append((position[0] - 1, position[1] - 1))
+
+        if guolu_location!=(-1,-1):
+            if abs(position[0]-guolu_location[0])==1 and position[1]==guolu_location[1]:
+                moves_list.append((guolu_location[0],guolu_location[1]-1)) 
+
     else:
         
         if (position[0], position[1] + 1) not in white_locations and \
@@ -551,6 +556,8 @@ def update_board():
     return board
 
 #main game loop
+round=0
+guolu_location=(-1,-1)
 can_yiwei_left=True
 can_yiwei_right=True
 is_victory_cg=False
@@ -675,8 +682,22 @@ while run:
                                 can_yiwei_right=False
 
                         if not is_yiwei:
-                                white_locations[selection] = click_coords
+                                #过路兵吃兵
+                                if guolu_location!=(-1,-1) and white_pieces[selection]=='pawn': 
+                                    if  abs(white_locations[selection][0]-guolu_location[0])==1:
+                                        if click_coords[0]==guolu_location[0] and (click_coords[1]-guolu_location[1])==-1:
+                                             black_piece = black_locations.index(guolu_location)
+                                             captured_pieces_white.append(black_pieces[black_piece])
+                                             black_pieces.pop(black_piece)
+                                             black_locations.pop(black_piece)
 
+                                #过路兵标记
+                                guolu_location=(-1,-1)
+                                if white_pieces[selection]=='pawn':
+                                    if (white_locations[selection][1]-click_coords[1])==2:
+                                        guolu_location=click_coords
+
+                                white_locations[selection] = click_coords
                                 if click_coords in black_locations:
                                     black_piece = black_locations.index(click_coords)
                                     captured_pieces_white.append(black_pieces[black_piece])
@@ -699,6 +720,7 @@ while run:
                 new_board=update_board()
                 
                 move = agent_instance.make_move(new_board.copy())
+                
                 selection=black_locations.index(move[0])
                 click_coords=move[1]
 
@@ -714,6 +736,17 @@ while run:
                         is_yiwei=True
 
                 if not is_yiwei:
+
+                    #过路兵
+                    if black_pieces[selection]=='pawn' and click_coords[0]==guolu_location[0] and (click_coords[1]-guolu_location[1])==1:
+                         white_piece = white_locations.index(guolu_location)
+                         captured_pieces_black.append(white_pieces[white_piece])
+                         white_pieces.pop(white_piece)
+                         white_locations.pop(white_piece)
+                    guolu_location=(-1,-1)
+                    if black_pieces[selection]=='pawn' and abs(black_locations[selection][1]-click_coords[1])==2 :
+                        guolu_location=click_coords
+
                     black_locations[selection] = click_coords
                     if click_coords in white_locations:
                         white_piece = white_locations.index(click_coords)
@@ -755,6 +788,7 @@ while run:
                 black_options = check_options(black_pieces, black_locations, 'black')
                 white_options = check_options(white_pieces, white_locations, 'white')
                 
+                guolu_location=(-1,-1)
                 can_yiwei_left=True
                 can_yiwei_right=True
                 is_victory_cg=False

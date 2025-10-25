@@ -36,6 +36,7 @@ class Agent:
         end_pos=random.choice(valid_cells)
 
         return [start_pos, end_pos]
+       
         
     
     #升阶处理
