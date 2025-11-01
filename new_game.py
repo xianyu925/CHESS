@@ -209,7 +209,6 @@ def draw_build_up():
     screen.blit(font.render(f'Press keyleft build up to bishop', True, 'white'), (610, 450))
     screen.blit(font.render(f'Press keyright build up to rook', True, 'white'), (610, 480))
 
-
 # draw a flashing square around king if in check
 def draw_check():
     if turn_step < 2:
@@ -263,7 +262,6 @@ def check_yiwei(type):
                     return False
     return True
 
-
 def draw_pieces():
     for i in range(len(white_pieces)):
         index = piece_list.index(white_pieces[i])
@@ -287,7 +285,6 @@ def draw_pieces():
                 pygame.draw.rect(screen, 'red', [black_locations[i][0] * 90 + 390, black_locations[i][1] * 96 + 72,
                                                   90, 96], 2)
 
-
 # function to check all pieces valid options on board
 def check_options(pieces, locations, turn):
     moves_list = []
@@ -309,7 +306,6 @@ def check_options(pieces, locations, turn):
             moves_list = check_king(location, turn)
         all_moves_list.append(moves_list)
     return all_moves_list
-
 
 # check king valid moves
 def check_king(position, color):
@@ -337,7 +333,6 @@ def check_king(position, color):
 
     return moves_list
 
-
 # check queen valid moves
 def check_queen(position, color):
     moves_list = check_bishop(position, color)
@@ -345,7 +340,6 @@ def check_queen(position, color):
     for i in range(len(second_list)):
         moves_list.append(second_list[i])
     return moves_list
-
 
 # check bishop moves
 def check_bishop(position, color):
@@ -382,7 +376,6 @@ def check_bishop(position, color):
                 path = False
     return moves_list
 
-
 # check rook moves
 def check_rook(position, color):
     moves_list = []
@@ -417,7 +410,6 @@ def check_rook(position, color):
             else:
                 path = False
     return moves_list
-
 
 # check valid pawn moves
 def check_pawn(position, color):
@@ -454,7 +446,6 @@ def check_pawn(position, color):
             moves_list.append((position[0] - 1, position[1] + 1))
     return moves_list
 
-
 # check valid knight moves
 def check_knight(position, color):
     moves_list = []
@@ -472,7 +463,6 @@ def check_knight(position, color):
             moves_list.append(target)
     return moves_list
 
-
 # check for valid moves for just selected piece
 def check_valid_moves():
     if turn_step < 2:
@@ -481,7 +471,6 @@ def check_valid_moves():
         options_list = black_options
     valid_options = options_list[selection]
     return valid_options
-
 
 # draw valid moves on screen
 def draw_valid(moves):
@@ -811,5 +800,3 @@ while run:
 
     pygame.display.flip()
 pygame.quit()
-
-
