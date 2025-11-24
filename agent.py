@@ -2,18 +2,19 @@
 import numpy as np
 import math
 
+
 class Agent:
     def __init__(self, depth: int = 3):
         # 搜索深度可以按电脑性能调
         self.depth = depth
         # 基本子力价值
         self.piece_values = {
-            1: 500,   # rook
-            2: 320,   # knight
-            3: 330,   # bishop
-            4: 900,   # queen
-            5: 20000, # king
-            6: 100,   # pawn
+            1: 500,  # rook
+            2: 320,  # knight
+            3: 330,  # bishop
+            4: 900,  # queen
+            5: 20000,  # king
+            6: 100,  # pawn
         }
 
     # ===================== 对外接口 =====================
@@ -33,11 +34,7 @@ class Agent:
         for move in moves:
             new_board = self._apply_move(board, move)
             score = self._minimax(
-                new_board,
-                self.depth - 1,
-                -math.inf,
-                math.inf,
-                False  # 轮到白
+                new_board, self.depth - 1, -math.inf, math.inf, False  # 轮到白
             )
             if score > best_score:
                 best_score = score
@@ -83,7 +80,14 @@ class Agent:
 
     # ===================== 核心搜索 =====================
 
-    def _minimax(self, board: np.ndarray, depth: int, alpha: float, beta: float, is_maximizing: bool) -> float:
+    def _minimax(
+        self,
+        board: np.ndarray,
+        depth: int,
+        alpha: float,
+        beta: float,
+        is_maximizing: bool,
+    ) -> float:
         # 终止条件
         if depth == 0 or self._is_terminal(board):
             return self._evaluate(board)
@@ -149,16 +153,47 @@ class Agent:
         if p == 6:  # pawn
             moves.extend(self._pawn_moves(board, x, y, side))
         elif p == 1:  # rook
-            moves.extend(self._slide_moves(board, x, y, side, directions=[(1,0), (-1,0), (0,1), (0,-1)]))
+            moves.extend(
+                self._slide_moves(
+                    board, x, y, side, directions=[(1, 0), (-1, 0), (0, 1), (0, -1)]
+                )
+            )
         elif p == 3:  # bishop
-            moves.extend(self._slide_moves(board, x, y, side, directions=[(1,1), (1,-1), (-1,1), (-1,-1)]))
+            moves.extend(
+                self._slide_moves(
+                    board, x, y, side, directions=[(1, 1), (1, -1), (-1, 1), (-1, -1)]
+                )
+            )
         elif p == 4:  # queen
-            moves.extend(self._slide_moves(board, x, y, side, directions=[
-                (1,0), (-1,0), (0,1), (0,-1),
-                (1,1), (1,-1), (-1,1), (-1,-1)
-            ]))
+            moves.extend(
+                self._slide_moves(
+                    board,
+                    x,
+                    y,
+                    side,
+                    directions=[
+                        (1, 0),
+                        (-1, 0),
+                        (0, 1),
+                        (0, -1),
+                        (1, 1),
+                        (1, -1),
+                        (-1, 1),
+                        (-1, -1),
+                    ],
+                )
+            )
         elif p == 2:  # knight
-            knight_dirs = [(1,2),(2,1),(2,-1),(1,-2),(-1,-2),(-2,-1),(-2,1),(-1,2)]
+            knight_dirs = [
+                (1, 2),
+                (2, 1),
+                (2, -1),
+                (1, -2),
+                (-1, -2),
+                (-2, -1),
+                (-2, 1),
+                (-1, 2),
+            ]
             for dx, dy in knight_dirs:
                 tx, ty = x + dx, y + dy
                 if 0 <= tx < 8 and 0 <= ty < 8:
@@ -166,7 +201,16 @@ class Agent:
                     if target * side <= 0:  # 空格或敌子
                         moves.append((tx, ty))
         elif p == 5:  # king
-            king_dirs = [(1,0),(-1,0),(0,1),(0,-1),(1,1),(1,-1),(-1,1),(-1,-1)]
+            king_dirs = [
+                (1, 0),
+                (-1, 0),
+                (0, 1),
+                (0, -1),
+                (1, 1),
+                (1, -1),
+                (-1, 1),
+                (-1, -1),
+            ]
             for dx, dy in king_dirs:
                 tx, ty = x + dx, y + dy
                 if 0 <= tx < 8 and 0 <= ty < 8:
@@ -177,14 +221,24 @@ class Agent:
             # 这里只做“看上去能过”的版本，不判将军，因为主程序也没给我们状态
             if piece > 0 and x == 4 and y == 0:
                 # 后翼易位：king(4,0) -> rook(0,0)
-                if board[0][0] == 1 and board[1][0] == 0 and board[2][0] == 0 and board[3][0] == 0:
+                if (
+                    board[0][0] == 1
+                    and board[1][0] == 0
+                    and board[2][0] == 0
+                    and board[3][0] == 0
+                ):
                     moves.append((0, 0))
                 # 王翼易位
                 if board[7][0] == 1 and board[5][0] == 0 and board[6][0] == 0:
                     moves.append((7, 0))
             # 给白也留一个，避免搜索时白完全不能 castle 导致评估怪
             if piece < 0 and x == 4 and y == 7:
-                if board[0][7] == -1 and board[1][7] == 0 and board[2][7] == 0 and board[3][7] == 0:
+                if (
+                    board[0][7] == -1
+                    and board[1][7] == 0
+                    and board[2][7] == 0
+                    and board[3][7] == 0
+                ):
                     moves.append((0, 7))
                 if board[7][7] == -1 and board[5][7] == 0 and board[6][7] == 0:
                     moves.append((7, 7))
@@ -283,6 +337,6 @@ class Agent:
         if not has_white_king and has_black_king:
             return 10**9
         if not has_black_king and has_white_king:
-            return -10**9
+            return -(10**9)
 
         return score
