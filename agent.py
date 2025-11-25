@@ -1,4 +1,3 @@
-# agent.py
 import numpy as np
 import math
 
@@ -22,25 +21,41 @@ class Agent:
     def make_move(self, board: np.ndarray):
         """
         给黑方(正数)走一步，返回 [(sx, sy), (tx, ty)]
+        使用 PVS (Principal Variation Search) 优化后的 alpha-beta 搜索。
         """
+        # 当前是黑方走，定义 color = 1 表示“轮到黑方”
+        color = 1
+
         best_score = -math.inf
         best_move = None
 
+        # 先生成所有黑方走法，并做简单排序（吃子优先）
         moves = self._get_all_moves(board, is_maximizing=True)
         if not moves:
-            # 没法走时也返回可下标的形式
+            # 没法走时也返回可下标的形式，避免崩
             return [(4, 0), (4, 0)]
+
+        alpha = -math.inf
+        beta = math.inf
 
         for move in moves:
             new_board = self._apply_move(board, move)
-            score = self._minimax(
-                new_board, self.depth - 1, -math.inf, math.inf, False  # 轮到白
+            # negamax + PVS 的根节点：对每个子节点调用 -PVS(...)
+            score = -self._pvs(
+                new_board,
+                self.depth - 1,
+                -beta,
+                -alpha,
+                -color,  # 轮到对手
             )
+
             if score > best_score:
                 best_score = score
                 best_move = move
+            if score > alpha:
+                alpha = score
 
-        # best_move 现在是 ((sx, sy), (tx, ty))，我们转成 list
+        # best_move 是 ((sx, sy), (tx, ty))，和你原来一样，转成 list
         return [best_move[0], best_move[1]]
 
     def build_up(self, board: np.ndarray) -> int:
@@ -78,46 +93,82 @@ class Agent:
                 best_choice = choice
         return best_choice
 
-    # ===================== 核心搜索 =====================
+    # ===================== PVS 搜索 =====================
 
-    def _minimax(
-        self,
-        board: np.ndarray,
-        depth: int,
-        alpha: float,
-        beta: float,
-        is_maximizing: bool,
+    def _pvs(
+        self, board: np.ndarray, depth: int, alpha: float, beta: float, color: int
     ) -> float:
-        # 终止条件
-        if depth == 0 or self._is_terminal(board):
-            return self._evaluate(board)
+        """
+        PVS (Principal Variation Search) 版本的 negamax + alpha-beta。
 
-        if is_maximizing:
-            max_eval = -math.inf
-            moves = self._get_all_moves(board, True)
-            if not moves:
-                return self._evaluate(board)
-            for move in moves:
-                new_board = self._apply_move(board, move)
-                eval_ = self._minimax(new_board, depth - 1, alpha, beta, False)
-                max_eval = max(max_eval, eval_)
-                alpha = max(alpha, eval_)
-                if beta <= alpha:
-                    break
-            return max_eval
-        else:
-            min_eval = math.inf
-            moves = self._get_all_moves(board, False)
-            if not moves:
-                return self._evaluate(board)
-            for move in moves:
-                new_board = self._apply_move(board, move)
-                eval_ = self._minimax(new_board, depth - 1, alpha, beta, True)
-                min_eval = min(min_eval, eval_)
-                beta = min(beta, eval_)
-                if beta <= alpha:
-                    break
-            return min_eval
+        参数：
+        - board: 当前局面
+        - depth: 当前剩余深度
+        - alpha, beta: alpha-beta 窗口（从根节点视角）
+        - color: 当前行棋方：
+            +1 表示“当前轮到黑方”
+            -1 表示“当前轮到白方”
+
+        返回：
+        - 从根节点视角的评估值（正数黑好，负数白好）
+        """
+        # 终止条件：深度为 0 或终局
+        if depth == 0 or self._is_terminal(board):
+            # self._evaluate 返回“黑方视角”的分数，color 表示当前是谁走子
+            # negamax 的标准写法：color * evaluate(node)
+            return color * self._evaluate(board)
+
+        # 根据当前行棋方生成所有走法
+        is_maximizing = color == 1  # color=1 -> 黑方走
+        moves = self._get_all_moves(board, is_maximizing)
+        if not moves:
+            # 无子可走，按静态评估
+            return color * self._evaluate(board)
+
+        first_child = True
+        best_score = -math.inf
+
+        for move in moves:
+            new_board = self._apply_move(board, move)
+
+            if first_child:
+                # 第一个孩子用正常窗口 [alpha, beta] 搜索
+                score = -self._pvs(
+                    new_board,
+                    depth - 1,
+                    -beta,
+                    -alpha,
+                    -color,
+                )
+                first_child = False
+            else:
+                # 后续孩子先用零窗口搜索（窄窗探测）
+                score = -self._pvs(
+                    new_board,
+                    depth - 1,
+                    -alpha - 1,
+                    -alpha,
+                    -color,
+                )
+                # 如果分数在 (alpha, beta) 之间，说明可能是主变，重搜一次完整窗口
+                if alpha < score < beta:
+                    score = -self._pvs(
+                        new_board,
+                        depth - 1,
+                        -beta,
+                        -score,
+                        -color,
+                    )
+
+            if score > best_score:
+                best_score = score
+            if score > alpha:
+                alpha = score
+            if alpha >= beta:
+                # beta 截断
+                break
+
+        return best_score
 
     # ===================== 走子生成 =====================
 
@@ -137,13 +188,58 @@ class Agent:
                     for to_pos in piece_moves:
                         moves.append(((x, y), to_pos))
 
-        # 简单排序：先走吃子的，有利剪枝
-        moves.sort(key=lambda m: 0 if board[m[1][0]][m[1][1]] != 0 else 1)
+        # ----- 这里是新的排序逻辑 -----
+
+        def move_makes_threat(move) -> bool:
+            """这步走完后，这个子下一步能不能吃到对方的子"""
+            (sx, sy), (tx, ty) = move
+            piece = board[sx][sy]
+
+            # 模拟这一步
+            new_board = board.copy()
+            new_board[tx][ty] = piece
+            new_board[sx][sy] = 0
+
+            # 看从新位置出发的所有走法里，有没有吃子的
+            next_moves = self._get_piece_moves(new_board, tx, ty, piece)
+            for nx, ny in next_moves:
+                target = new_board[nx][ny]
+                if target * -side > 0:  # 对方的子
+                    return True
+            return False
+
+        def move_sort_key(move):
+            (sx, sy), (tx, ty) = move
+            piece = board[sx][sy]
+            target = board[tx][ty]
+
+            # 1) 吃子优先
+            if target * -side > 0:
+                priority = 0
+
+            # 2) 形成威胁（下一步能吃）的其次
+            elif move_makes_threat(move):
+                priority = 1
+
+            else:
+                # 3) 前进 / 横向 / 后退
+                dx = tx - sx
+
+                if dx * side > 0:  # 朝前
+                    priority = 2
+                elif dx == 0:  # 横向
+                    priority = 3
+                else:  # 朝后
+                    priority = 4
+
+            return priority
+
+        moves.sort(key=move_sort_key)
         return moves
 
     def _get_piece_moves(self, board: np.ndarray, x: int, y: int, piece: int):
         """
-        生成单个棋子的所有伪合法走法（不判断将军）
+        生成单个棋子的所有伪合法走法（不判断是否自家王被将军）
         返回 [(tx, ty), ...]
         """
         moves = []
@@ -217,8 +313,9 @@ class Agent:
                     target = board[tx][ty]
                     if target * side <= 0:
                         moves.append((tx, ty))
-            # 简单王车易位（和你主循环黑方的写法对上：king(4,0)->(0,0)/(7,0)）
-            # 这里只做“看上去能过”的版本，不判将军，因为主程序也没给我们状态
+
+            # 简单王车易位（保持和主循环逻辑一致：king(4,0)->(0,0)/(7,0)）
+            # 这里只做“看上去能过”的版本，不判将军
             if piece > 0 and x == 4 and y == 0:
                 # 后翼易位：king(4,0) -> rook(0,0)
                 if (
@@ -253,14 +350,16 @@ class Agent:
         moves = []
         dy = 1 if side == 1 else -1
         ny = y + dy
+
         # 前进一步
         if 0 <= ny < 8 and board[x][ny] == 0:
             moves.append((x, ny))
             # 起始位前进两格
             start_rank = 1 if side == 1 else 6
             ny2 = y + 2 * dy
-            if y == start_rank and board[x][ny2] == 0:
+            if y == start_rank and 0 <= ny2 < 8 and board[x][ny2] == 0:
                 moves.append((x, ny2))
+
         # 吃子
         for dx in (-1, 1):
             nx = x + dx
