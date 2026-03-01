@@ -1,0 +1,5 @@
+chess
+pygame
+numpy
+moviepy
+copy
