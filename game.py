@@ -1,7 +1,5 @@
-# two player chess in python with Pygame!
-# part one, set up variables images and game loop
-
 import pygame
+import copy
 import cv2
 import numpy as np
 from moviepy import VideoFileClip
@@ -303,14 +301,20 @@ counter = 0
 winner = ""
 game_over = False
 is_game_start = False
+is_heqi = False
 
 
 def draw_game_over():
     """简化版本 - 直接显示游戏结束界面"""
     # 显示游戏结束界面
-    pygame.draw.rect(screen, "black", [600, 380, 400, 70])
-    screen.blit(font.render(f"{winner} won the game!", True, "white"), (610, 390))
-    screen.blit(font.render(f"Press ENTER to Restart!", True, "white"), (610, 420))
+    if not is_heqi:
+        pygame.draw.rect(screen, "black", [600, 380, 400, 70])
+        screen.blit(font.render(f"{winner} won the game!", True, "white"), (610, 390))
+        screen.blit(font.render(f"Press ENTER to Restart!", True, "white"), (610, 420))
+    else:
+        pygame.draw.rect(screen, "black", [600, 380, 400, 70])
+        screen.blit(font.render(f"Stalemate!", True, "white"), (610, 390))
+        screen.blit(font.render(f"Press ENTER to Restart!", True, "white"), (610, 420))
 
 
 def draw_build_up():
@@ -331,42 +335,42 @@ def draw_build_up():
 
 # draw a flashing square around king if in check
 def draw_check():
-    if turn_step < 2:
-        if "king" in white_pieces:
-            king_index = white_pieces.index("king")
-            king_location = white_locations[king_index]
-            for i in range(len(black_options)):
-                if king_location in black_options[i]:
-                    if counter < 15:
-                        pygame.draw.rect(
-                            screen,
-                            "dark red",
-                            [
-                                white_locations[king_index][0] * 90 + 390,
-                                white_locations[king_index][1] * 96 + 72,
-                                90,
-                                96,
-                            ],
-                            5,
-                        )
-    else:
-        if "king" in black_pieces:
-            king_index = black_pieces.index("king")
-            king_location = black_locations[king_index]
-            for i in range(len(white_options)):
-                if king_location in white_options[i]:
-                    if counter < 15:
-                        pygame.draw.rect(
-                            screen,
-                            "dark blue",
-                            [
-                                black_locations[king_index][0] * 90 + 390,
-                                black_locations[king_index][1] * 96 + 72,
-                                90,
-                                96,
-                            ],
-                            5,
-                        )
+
+    if "king" in white_pieces:
+        king_index = white_pieces.index("king")
+        king_location = white_locations[king_index]
+        for i in range(len(black_options)):
+            if king_location in black_options[i]:
+                if counter < 15:
+                    pygame.draw.rect(
+                        screen,
+                        "dark red",
+                        [
+                            white_locations[king_index][0] * 90 + 390,
+                            white_locations[king_index][1] * 96 + 72,
+                            90,
+                            96,
+                        ],
+                        5,
+                    )
+
+    if "king" in black_pieces:
+        king_index = black_pieces.index("king")
+        king_location = black_locations[king_index]
+        for i in range(len(white_options)):
+            if king_location in white_options[i]:
+                if True:
+                    pygame.draw.rect(
+                        screen,
+                        "dark blue",
+                        [
+                            black_locations[king_index][0] * 90 + 390,
+                            black_locations[king_index][1] * 96 + 72,
+                            90,
+                            96,
+                        ],
+                        5,
+                    )
 
 
 def check_yiwei(type):
@@ -381,7 +385,7 @@ def check_yiwei(type):
         for target in targets:
             if target in friends_list or target in enemies_list:
                 return False
-        targets.extend([(4, 7), (7, 7)])
+        targets.extend([(4, 7), (6, 7)])
         for target in targets:
             for i in range(len(black_options)):
                 if target in black_options[i]:
@@ -394,7 +398,7 @@ def check_yiwei(type):
         for target in targets:
             if target in friends_list or target in enemies_list:
                 return False
-        targets.extend([(0, 7), (4, 7)])
+        targets.extend([(1, 7), (4, 7)])
         for target in targets:
             for i in range(len(black_options)):
                 if target in black_options[i]:
@@ -457,24 +461,24 @@ def draw_pieces():
 
 
 # function to check all pieces valid options on board
-def check_options(pieces, locations, turn):
+def check_options(pieces, locations, color):
     moves_list = []
     all_moves_list = []
     for i in range((len(pieces))):
         location = locations[i]
         piece = pieces[i]
         if piece == "pawn":
-            moves_list = check_pawn(location, turn)
+            moves_list = check_pawn(location, color)
         elif piece == "rook":
-            moves_list = check_rook(location, turn)
+            moves_list = check_rook(location, color)
         elif piece == "knight":
-            moves_list = check_knight(location, turn)
+            moves_list = check_knight(location, color)
         elif piece == "bishop":
-            moves_list = check_bishop(location, turn)
+            moves_list = check_bishop(location, color)
         elif piece == "queen":
-            moves_list = check_queen(location, turn)
+            moves_list = check_queen(location, color)
         elif piece == "king":
-            moves_list = check_king(location, turn)
+            moves_list = check_king(location, color)
         all_moves_list.append(moves_list)
     return all_moves_list
 
@@ -716,9 +720,8 @@ def update_winner():
 
     white_king_alive, black_king_alive = check_kings_alive()
 
-    if not white_king_alive and not black_king_alive:
+    if winner == "draw":
         winner = "draw"  # 平局
-
     elif not white_king_alive:
         winner = "black"  # 黑方胜利
 
@@ -762,7 +765,227 @@ def update_board():
     return board
 
 
+def draw_board():
+    board = np.zeros((8, 8), dtype=int)
+
+    # 放置棋子
+    for i in range(len(white_pieces)):
+        x, y = white_locations[i]
+        if white_pieces[i] == "rook":
+            board[y][x] = -1
+        elif white_pieces[i] == "knight":
+            board[y][x] = -2
+        elif white_pieces[i] == "bishop":
+            board[y][x] = -3
+        elif white_pieces[i] == "queen":
+            board[y][x] = -4
+        elif white_pieces[i] == "king":
+            board[y][x] = -5
+        elif white_pieces[i] == "pawn":
+            board[y][x] = -6
+
+    for i in range(len(black_pieces)):
+        x, y = black_locations[i]
+        if black_pieces[i] == "rook":
+            board[y][x] = 1
+        elif black_pieces[i] == "knight":
+            board[y][x] = 2
+        elif black_pieces[i] == "bishop":
+            board[y][x] = 3
+        elif black_pieces[i] == "queen":
+            board[y][x] = 4
+        elif black_pieces[i] == "king":
+            board[y][x] = 5
+        elif black_pieces[i] == "pawn":
+            board[y][x] = 6
+
+    # 创建字符表示法的棋盘
+    char_board = []
+    for i in range(8):
+        row = []
+        for j in range(8):
+            piece_code = board[i][j]
+            if piece_code == 0:
+                row.append("-")
+            elif piece_code == -1:
+                row.append("r")  # 白车
+            elif piece_code == -2:
+                row.append("n")  # 白马
+            elif piece_code == -3:
+                row.append("b")  # 白象
+            elif piece_code == -4:
+                row.append("q")  # 白后
+            elif piece_code == -5:
+                row.append("k")  # 白王
+            elif piece_code == -6:
+                row.append("p")  # 白兵
+            elif piece_code == 1:
+                row.append("R")  # 黑车
+            elif piece_code == 2:
+                row.append("N")  # 黑马
+            elif piece_code == 3:
+                row.append("B")  # 黑象
+            elif piece_code == 4:
+                row.append("Q")  # 黑后
+            elif piece_code == 5:
+                row.append("K")  # 黑王
+            elif piece_code == 6:
+                row.append("P")  # 黑兵
+        char_board.append(row)
+
+    for i in range(8):  # 从第0行到第7行（对应第8行到第1行）
+        print(f"{8-i} ", end="")
+        for j in range(8):
+            print(char_board[i][j], end=" ")
+        print()
+
+    print("  a b c d e f g h")
+
+    return board
+
+
+# 检查是否无子可动
+def check_stalemate(color):
+    global white_locations, black_locations, white_options, black_options, white_pieces, black_pieces
+    # 检查王是否被将军
+    if color == "white":
+        if "king" in white_pieces:
+            king_index = white_pieces.index("king")
+            king_location = white_locations[king_index]
+            for i in range(len(black_options)):
+                if king_location in black_options[i]:
+                    return False
+    else:
+        if "king" in black_pieces:
+            king_index = black_pieces.index("king")
+            king_location = black_locations[king_index]
+            for i in range(len(white_options)):
+                if king_location in white_options[i]:
+                    return False
+
+    if color == "white":
+        temp_white_pieces = copy.deepcopy(white_pieces)
+        temp_black_pieces = copy.deepcopy(black_pieces)
+        temp_white_options = copy.deepcopy(white_options)
+        temp_black_options = copy.deepcopy(black_options)
+        temp_white_locations = copy.deepcopy(white_locations)
+        temp_black_locations = copy.deepcopy(black_locations)
+        for i in range(len(white_pieces)):
+            location = white_locations[i]
+            piece = white_pieces[i]
+            if piece == "pawn":
+                moves_list = check_pawn(location, color)
+            elif piece == "rook":
+                moves_list = check_rook(location, color)
+            elif piece == "knight":
+                moves_list = check_knight(location, color)
+            elif piece == "bishop":
+                moves_list = check_bishop(location, color)
+            elif piece == "queen":
+                moves_list = check_queen(location, color)
+            elif piece == "king":
+                moves_list = check_king(location, color)
+            for j in range(len(moves_list)):
+                white_pieces[:] = temp_white_pieces
+                black_pieces[:] = temp_black_pieces
+                white_options[:] = temp_white_options
+                black_options[:] = temp_black_options
+                white_locations[:] = temp_white_locations
+                black_locations[:] = temp_black_locations
+                flag = True
+                white_locations[i] = moves_list[j]
+                if moves_list[j] in black_locations:
+                    black_piece_capture = black_locations.index(moves_list[j])
+                    black_pieces.pop(black_piece_capture)
+                    black_locations.pop(black_piece_capture)
+                black_options = check_options(black_pieces, black_locations, "black")
+                if "king" in white_pieces:
+                    king_index = white_pieces.index("king")
+                    king_location = white_locations[king_index]
+                    for k in range(len(black_options)):
+                        if king_location in black_options[k]:
+                            flag = False
+                            break
+                if flag:
+                    white_pieces[:] = temp_white_pieces
+                    black_pieces[:] = temp_black_pieces
+                    white_options[:] = temp_white_options
+                    black_options[:] = temp_black_options
+                    white_locations[:] = temp_white_locations
+                    black_locations[:] = temp_black_locations
+                    return False
+        white_pieces[:] = temp_white_pieces
+        black_pieces[:] = temp_black_pieces
+        white_options[:] = temp_white_options
+        black_options[:] = temp_black_options
+        white_locations[:] = temp_white_locations
+        black_locations[:] = temp_black_locations
+        return True
+
+    if color == "black":
+        temp_white_pieces = copy.deepcopy(white_pieces)
+        temp_black_pieces = copy.deepcopy(black_pieces)
+        temp_white_options = copy.deepcopy(white_options)
+        temp_black_options = copy.deepcopy(black_options)
+        temp_white_locations = copy.deepcopy(white_locations)
+        temp_black_locations = copy.deepcopy(black_locations)
+        for i in range(len(black_pieces)):
+            location = black_locations[i]
+            piece = black_pieces[i]
+            if piece == "pawn":
+                moves_list = check_pawn(location, color)
+            elif piece == "rook":
+                moves_list = check_rook(location, color)
+            elif piece == "knight":
+                moves_list = check_knight(location, color)
+            elif piece == "bishop":
+                moves_list = check_bishop(location, color)
+            elif piece == "queen":
+                moves_list = check_queen(location, color)
+            elif piece == "king":
+                moves_list = check_king(location, color)
+            for j in range(len(moves_list)):
+                white_pieces[:] = temp_white_pieces
+                black_pieces[:] = temp_black_pieces
+                white_options[:] = temp_white_options
+                black_options[:] = temp_black_options
+                white_locations[:] = temp_white_locations
+                black_locations[:] = temp_black_locations
+                flag = True
+                black_locations[i] = moves_list[j]
+                if moves_list[j] in white_locations:
+                    white_piece_capture = white_locations.index(moves_list[j])
+                    white_pieces.pop(white_piece_capture)
+                    white_locations.pop(white_piece_capture)
+                white_options = check_options(white_pieces, white_locations, "white")
+                if "king" in black_pieces:
+                    king_index = black_pieces.index("king")
+                    king_location = black_locations[king_index]
+                    for k in range(len(white_options)):
+                        if king_location in white_options[k]:
+                            flag = False
+                            break
+                if flag:
+                    white_pieces[:] = temp_white_pieces
+                    black_pieces[:] = temp_black_pieces
+                    white_options[:] = temp_white_options
+                    black_options[:] = temp_black_options
+                    white_locations[:] = temp_white_locations
+                    black_locations[:] = temp_black_locations
+                    return False
+        white_pieces[:] = temp_white_pieces
+        black_pieces[:] = temp_black_pieces
+        white_options[:] = temp_white_options
+        black_options[:] = temp_black_options
+        white_locations[:] = temp_white_locations
+        black_locations[:] = temp_black_locations
+        return True
+
+
 # main game loop
+white_have_yiwei = False
+black_have_yiwei = False
+is_heqi = False
 round = 0
 guolu_location = (-1, -1)
 can_yiwei_left = True
@@ -779,7 +1002,7 @@ white_options = check_options(white_pieces, white_locations, "white")
 agent_instance = Agent()
 
 
-play_music("BGM/Sway to My Beat in Cosmos.flac", volume=0.7)
+play_music("BGM/Sway to My Beat in Cosmos.flac", volume=10.0)
 
 run = True
 while run:
@@ -883,6 +1106,18 @@ while run:
 
         if not game_over:
             if turn_step <= 1:
+                is_heqi = check_stalemate("white")
+                if is_heqi:
+                    game_over = True
+                    winner = "draw"
+            else:
+                is_heqi = check_stalemate("black")
+                if is_heqi:
+                    game_over = True
+                    winner = "draw"
+
+        if not game_over:
+            if turn_step <= 1:
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     x_coord = (event.pos[0] - 395) // 90
                     y_coord = (event.pos[1] - 75) // 96
@@ -909,6 +1144,7 @@ while run:
                                     7,
                                 )
                                 white_locations[selection] = (2, 7)
+                                white_have_yiwei = True
                                 is_yiwei = True
                             if click_coords == (7, 7) and can_yiwei_right:
                                 white_locations[white_locations.index(click_coords)] = (
@@ -916,6 +1152,7 @@ while run:
                                     7,
                                 )
                                 white_locations[selection] = (6, 7)
+                                white_have_yiwei = True
                                 is_yiwei = True
 
                             can_yiwei_right = False
@@ -976,67 +1213,86 @@ while run:
                                 ):
                                     promote_location = click_coords
                                     is_white_promoting = True
+                        # draw_board()
                         black_options = check_options(
                             black_pieces, black_locations, "black"
                         )
                         white_options = check_options(
                             white_pieces, white_locations, "white"
                         )
+                        round = round + 1
                         turn_step = 2
                         selection = 100
                         valid_moves = []
-            elif turn_step > 1:
+            elif (
+                turn_step > 1
+                and not is_black_promoting
+                and not is_white_promoting
+                and winner == ""
+            ):
                 turn_step = 3
 
                 new_board = update_board()
 
-                move = agent_instance.make_move(new_board.copy())
+                move = agent_instance.make_move(
+                    round, white_have_yiwei, black_have_yiwei, new_board.copy()
+                )
+                if move[0] == (4, 0) and move[1] == (4, 0):
+                    winner = "white"
 
-                selection = black_locations.index(move[0])
-                click_coords = move[1]
+                if winner == "":
+                    selection = black_locations.index(move[0])
+                    click_coords = move[1]
 
-                is_yiwei = False
-                if black_pieces[selection] == "king" and move[0] == (4, 0):
-                    if click_coords == (0, 0):
-                        black_locations[selection] = (2, 0)
-                        black_locations[black_locations.index(move[1])] = (3, 0)
-                        is_yiwei = True
-                    if click_coords == (7, 0):
-                        black_locations[selection] = (6, 0)
-                        black_locations[black_locations.index(move[1])] = (5, 0)
-                        is_yiwei = True
+                    is_yiwei = False
+                    if black_pieces[selection] == "king" and move[0] == (4, 0):
+                        if click_coords == (0, 0):
+                            black_locations[selection] = (2, 0)
+                            black_locations[black_locations.index(move[1])] = (3, 0)
+                            black_have_yiwei = True
+                            is_yiwei = True
+                        if click_coords == (7, 0):
+                            black_locations[selection] = (6, 0)
+                            black_locations[black_locations.index(move[1])] = (5, 0)
+                            black_have_yiwei = True
+                            is_yiwei = True
 
-                if not is_yiwei:
+                    if not is_yiwei:
 
-                    # 过路兵
-                    if (
-                        black_pieces[selection] == "pawn"
-                        and click_coords[0] == guolu_location[0]
-                        and (click_coords[1] - guolu_location[1]) == 1
-                    ):
-                        white_piece = white_locations.index(guolu_location)
-                        captured_pieces_black.append(white_pieces[white_piece])
-                        white_pieces.pop(white_piece)
-                        white_locations.pop(white_piece)
-                    guolu_location = (-1, -1)
-                    if (
-                        black_pieces[selection] == "pawn"
-                        and abs(black_locations[selection][1] - click_coords[1]) == 2
-                    ):
-                        guolu_location = click_coords
+                        # 过路兵
+                        if (
+                            black_pieces[selection] == "pawn"
+                            and click_coords[0] == guolu_location[0]
+                            and (click_coords[1] - guolu_location[1]) == 1
+                        ):
+                            white_piece = white_locations.index(guolu_location)
+                            captured_pieces_black.append(white_pieces[white_piece])
+                            white_pieces.pop(white_piece)
+                            white_locations.pop(white_piece)
+                        guolu_location = (-1, -1)
+                        if (
+                            black_pieces[selection] == "pawn"
+                            and abs(black_locations[selection][1] - click_coords[1])
+                            == 2
+                        ):
+                            guolu_location = click_coords
 
-                    black_locations[selection] = click_coords
-                    if click_coords in white_locations:
-                        white_piece = white_locations.index(click_coords)
-                        captured_pieces_black.append(white_pieces[white_piece])
-                        if white_pieces[white_piece] == "king":
-                            winner = "black"
-                        white_pieces.pop(white_piece)
-                        white_locations.pop(white_piece)
-                    if click_coords in target_locations:
-                        if black_pieces[black_locations.index(click_coords)] == "pawn":
-                            promote_location = click_coords
-                            is_black_promoting = True
+                        black_locations[selection] = click_coords
+                        if click_coords in white_locations:
+                            white_piece = white_locations.index(click_coords)
+                            captured_pieces_black.append(white_pieces[white_piece])
+                            if white_pieces[white_piece] == "king":
+                                winner = "black"
+                            white_pieces.pop(white_piece)
+                            white_locations.pop(white_piece)
+                        if click_coords in target_locations:
+                            if (
+                                black_pieces[black_locations.index(click_coords)]
+                                == "pawn"
+                            ):
+                                promote_location = click_coords
+                                is_black_promoting = True
+                # draw_board()
                 black_options = check_options(black_pieces, black_locations, "black")
                 white_options = check_options(white_pieces, white_locations, "white")
                 turn_step = 0
@@ -1128,6 +1384,8 @@ while run:
                 white_options = check_options(white_pieces, white_locations, "white")
 
                 guolu_location = (-1, -1)
+                white_have_yiwei = False
+                black_have_yiwei = False
                 can_yiwei_left = True
                 can_yiwei_right = True
                 is_victory_cg = False
@@ -1136,17 +1394,21 @@ while run:
                 is_white_promoting = False
                 is_black_promoting = False
                 promote_location = (0, 0)
+                is_heqi = False
+                round = 0
                 update_board()
     update_winner()
 
     if winner != "" and not is_victory_cg_played:
-        if winner == "white":
-            is_white_cg = True
-        else:
-            is_white_cg = False
         is_victory_cg = True
         game_over = True
         is_victory_cg_played = True
+        if winner == "white":
+            is_white_cg = True
+        elif winner == "black":
+            is_white_cg = False
+        elif winner == "draw":
+            is_victory_cg = False
 
     pygame.display.flip()
 pygame.quit()
